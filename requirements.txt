@@ -1,0 +1,5 @@
+langgraph==1.2.7
+langchain-core==1.4.8
+langchain-deepseek==1.1.0
+python-dotenv==1.2.2
+pytest==9.1.1
