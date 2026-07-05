@@ -1,5 +1,7 @@
 # LangGraph Multi-Agent Orchestrator
 
+[![CI](https://github.com/VMG-Emjan/langgraph-orchestrator/actions/workflows/ci.yml/badge.svg)](https://github.com/VMG-Emjan/langgraph-orchestrator/actions/workflows/ci.yml)
+
 A **formal, framework-based multi-agent orchestration** system built with
 **LangGraph**. It implements a classic **planner → tool → critic** loop as a
 compiled **`StateGraph`** with **conditional routing** (`add_conditional_edges`)
