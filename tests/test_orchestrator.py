@@ -71,7 +71,20 @@ def test_graph_retries_then_approves(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# 4. plan parser tolerates JSON fences and bullet fallbacks
+# 4. fail_first injects an empty result on pass 1 only
+# --------------------------------------------------------------------------- #
+def test_fail_first_injects_empty_on_first_pass_only():
+    plan = ["a", "b"]
+    first = tool_node({"plan": plan, "fail_first": True, "retries": 0})
+    assert first["results"][0]["tool_output"] == ""  # step 0 failed
+    assert first["results"][1]["tool_output"] != ""
+
+    second = tool_node({"plan": plan, "fail_first": True, "retries": 1})
+    assert all(r["tool_output"] for r in second["results"])  # recovered
+
+
+# --------------------------------------------------------------------------- #
+# 5. plan parser tolerates JSON fences and bullet fallbacks
 # --------------------------------------------------------------------------- #
 def test_parse_plan_variants():
     assert nodes._parse_plan('```json\n["a","b"]\n```') == ["a", "b"]

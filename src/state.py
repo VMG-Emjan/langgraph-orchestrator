@@ -33,9 +33,10 @@ class OrchestratorState(TypedDict, total=False):
 
     task: str
     plan: List[str]
-    results: Annotated[List[Step], operator.add]
+    results: List[Step]  # overwritten each pass; latest pass wins
     critique: str
     approved: bool
     retries: int
     max_retries: int
+    fail_first: bool  # demo: force one failed step on pass 1 to trigger a retry
     trace: Annotated[List[str], operator.add]

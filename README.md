@@ -94,10 +94,45 @@ APPROVED: True | PASSES: 1
 CRITIQUE: All four sub-tasks completed with non-empty results.
 ```
 
-Here the critic approved on the first pass. When it rejects, the conditional
-edge routes **back to the planner** with the critique for another attempt
-(capped by `max_retries`); that loop-back is exercised deterministically in
+Here the critic approved on the first pass.
+
+### Live loop-back (real retry)
+
+`examples/run_retry_example.py` forces one tool step to fail on the first pass
+(`fail_first=True`). The **real DeepSeek critic** detects the failed step,
+rejects the work, and the conditional edge routes **back to the planner** — the
+second pass recovers and is approved:
+
+```
+EXECUTION TRACE (planner -> tool -> critic -> planner loop-back):
+  [planner] produced 4 steps: [...]
+  [tool] executed 4 step(s), 1 empty result(s)
+  [critic] pass=1 approved=False reason='First step produced <NO_OUTPUT>, which is a failed step.'
+  [planner] produced 4 steps: [...]
+  [tool] executed 4 step(s), 0 empty result(s)
+  [critic] pass=2 approved=True reason='All steps produced real outputs with sufficient length.'
+APPROVED: True | PASSES: 2
+```
+
+The same loop-back is also covered deterministically (LLM mocked) in
 `tests/test_orchestrator.py::test_graph_retries_then_approves`.
+
+## Why LangGraph (vs. ad-hoc glue)
+
+Wiring agents together with plain function calls or a workflow tool (n8n, cron,
+scripts) breaks down once you need **cycles, conditional branching, and durable
+state**. LangGraph gives those as first-class primitives:
+
+- **`StateGraph` + typed state** — one explicit state object, not implicit
+  kwargs threaded by hand.
+- **`add_conditional_edges`** — the critic can loop back or finish based on
+  runtime output; a DAG-only tool can't express this retry cycle.
+- **Checkpointer (`MemorySaver`)** — state is persisted per thread, so a run is
+  resumable and inspectable instead of vanishing between calls.
+- **Deterministic testing** — nodes are plain functions, so the LLM is mocked
+  and the control flow is unit-tested without spending tokens.
+
+That is the difference between *orchestrating* agents and just *calling* them.
 
 ## CI
 

@@ -87,13 +87,27 @@ def _run_tool(step: str) -> str:
 
 
 def tool_node(state: OrchestratorState) -> dict:
-    """Run the deterministic tool for every planned step."""
+    """Run the deterministic tool for every planned step.
+
+    When ``fail_first`` is set, the first step returns an empty output on the
+    very first pass (retries == 0). This simulates a real tool failure so the
+    critic rejects the work and the graph loops back to the planner — a live
+    demonstration of the conditional retry edge.
+    """
+    first_pass = state.get("retries", 0) == 0
+    inject_failure = bool(state.get("fail_first")) and first_pass
+
     results: List[Step] = []
-    for step in state.get("plan", []):
-        results.append(Step(description=step, tool_output=_run_tool(step)))
+    for i, step in enumerate(state.get("plan", [])):
+        if inject_failure and i == 0:
+            results.append(Step(description=step, tool_output=""))  # simulated failure
+        else:
+            results.append(Step(description=step, tool_output=_run_tool(step)))
+
+    failures = sum(1 for r in results if not r["tool_output"])
     return {
         "results": results,
-        "trace": [f"[tool] executed {len(results)} step(s)"],
+        "trace": [f"[tool] executed {len(results)} step(s), {failures} empty result(s)"],
     }
 
 
@@ -102,9 +116,11 @@ def tool_node(state: OrchestratorState) -> dict:
 # --------------------------------------------------------------------------- #
 
 CRITIC_SYSTEM = (
-    "You are a critic agent. Given a task and the tool outputs, decide if the "
-    'work is sufficient. Reply ONLY with JSON: {"approved": true|false, '
-    '"reason": "<short>"}. Approve when every sub-task has a non-empty result.'
+    "You are a critic agent. Given a task and its tool outputs, decide if the "
+    "work is sufficient. Any step whose result is <NO_OUTPUT> is a FAILED step. "
+    "Reject (approved=false) if ANY step is <NO_OUTPUT>; approve only when every "
+    'step produced a real result. Reply ONLY with JSON: {"approved": true|false, '
+    '"reason": "<short>"}.'
 )
 
 
@@ -121,7 +137,9 @@ def critic_node(state: OrchestratorState) -> dict:
     """Judge the tool outputs; approve or send the loop back to the planner."""
     retries = state.get("retries", 0) + 1
     results = state.get("results", [])
-    summary = "\n".join(f"- {r['description']}: {r['tool_output']}" for r in results)
+    summary = "\n".join(
+        f"- {r['description']}: {r['tool_output'] or '<NO_OUTPUT>'}" for r in results
+    )
 
     llm = get_llm()
     reply = llm.invoke(
