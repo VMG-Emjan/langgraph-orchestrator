@@ -86,8 +86,11 @@ PLAN: ['Identify key benefits of LangGraph for multi-agent orchestration',
        'Draft a concise outline covering main points']
 ----------------------------------------------------------------------
 EXECUTION TRACE (planner -> tool -> critic loop):
-  [planner] produced 4 steps: [...]
-  [tool] executed 4 step(s)
+  [planner] produced 4 steps: ['Identify key benefits of LangGraph for multi-agent orchestration',
+                               'Gather supporting examples and use cases',
+                               'Structure the blog post outline with introduction, body, and conclusion',
+                               'Draft a concise outline covering main points']
+  [tool] executed 4 step(s), 0 empty result(s)
   [critic] pass=1 approved=True reason='All four sub-tasks completed with non-empty results.'
 ----------------------------------------------------------------------
 APPROVED: True | PASSES: 1
@@ -105,10 +108,13 @@ second pass recovers and is approved:
 
 ```
 EXECUTION TRACE (planner -> tool -> critic -> planner loop-back):
-  [planner] produced 4 steps: [...]
+  [planner] produced 4 steps: ['Identify the core concept of conditional routing in agent graphs',
+                               'Explain how conditional routing enables dynamic decision-making',
+                               'Discuss the benefits for efficiency and flexibility',
+                               'Provide a concise summary of its importance']
   [tool] executed 4 step(s), 1 empty result(s)
   [critic] pass=1 approved=False reason='First step produced <NO_OUTPUT>, which is a failed step.'
-  [planner] produced 4 steps: [...]
+  [planner] produced 4 steps: [... replanned ...]
   [tool] executed 4 step(s), 0 empty result(s)
   [critic] pass=2 approved=True reason='All steps produced real outputs with sufficient length.'
 APPROVED: True | PASSES: 2

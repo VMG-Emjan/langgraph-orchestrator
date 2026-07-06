@@ -15,6 +15,10 @@ import datetime as _dt
 import pathlib
 import sys
 
+# Ensure Unicode (e.g. arrows) prints on any console, incl. Windows cp1254.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from src.graph import build_graph  # noqa: E402

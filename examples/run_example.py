@@ -13,6 +13,10 @@ import datetime as _dt
 import pathlib
 import sys
 
+# Ensure Unicode prints on any console, incl. Windows cp1254.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 # Make ``src`` importable when run as a plain script.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
