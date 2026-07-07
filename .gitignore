@@ -6,3 +6,9 @@ __pycache__/
 logs/*.log
 .venv/
 venv/
+.ruff_cache/
+data/traces.db
+infra/cloudflare/.terraform/
+infra/cloudflare/*.tfstate*
+infra/cloudflare/*.tfvars
+infra/cloudflare/tfplan

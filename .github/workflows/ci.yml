@@ -22,7 +22,7 @@ jobs:
           pip install ruff
 
       - name: Lint (ruff)
-        run: ruff check src tests examples
+        run: ruff check src app tests examples
 
       - name: Test (pytest, no API key needed)
         run: pytest -q

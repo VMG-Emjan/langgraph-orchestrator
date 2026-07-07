@@ -13,6 +13,67 @@ This repo is a minimal, runnable reference for **LangGraph multi-agent
 orchestration** — the kind of formal orchestration framework (vs. ad-hoc glue)
 that production agent systems are built on.
 
+## 🌐 Live deployment (RAG + judge + orchestration)
+
+The graphs are **deployed and publicly reachable** — open-source LangGraph
+served by FastAPI, no managed LangGraph Platform, no LangSmith:
+
+| Layer | URL | Provisioned by |
+|-------|-----|----------------|
+| App (Hugging Face Space, Docker, free tier) | https://auratum-langgraph-rag-orchestrator.hf.space | `huggingface_hub` push |
+| Edge endpoint (Cloudflare Worker, free plan) | https://langgraph-rag-proxy.auratum.workers.dev | **real `terraform apply`** (`infra/cloudflare/`) |
+
+The live service adds a second StateGraph — a **RAG pipeline with a real LLM
+judge**: `retrieve → answer → judge`, where the DeepSeek judge scores
+faithfulness/relevance and a conditional edge loops back through a **query
+rewrite** on rejection.
+
+```
+GET  /health           liveness + indexed chunk count
+POST /ask              RAG answer + judge verdict + node trace
+POST /eval             golden question set through the judge
+GET  /trace/{id}       node-by-node trace of a past run (SQLite, $0 LangSmith stand-in)
+POST /orchestrate      planner→tool→critic demo with live fail_first retry loop-back
+GET  /docs             OpenAPI UI
+```
+
+Try it:
+
+```bash
+curl https://langgraph-rag-proxy.auratum.workers.dev/health
+
+curl https://langgraph-rag-proxy.auratum.workers.dev/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"Which retrieval mode had the best recall in rag-eval-lab?"}'
+```
+
+Real response captured from the live endpoint (DeepSeek judge, unedited):
+
+```json
+{
+  "answer": "The best recall was achieved by hybrid mode with a recall@5 of 1.000 [rag-eval-lab]. Graph mode had a p95 latency of 418 ms [rag-eval-lab].",
+  "verdict": {"faithful": true, "relevance": 1.0, "score": 1.0,
+              "reason": "Answer directly addresses both parts of the question, is fully supported by context, and contains no hallucinated claims."},
+  "approved": true, "retries": 1
+}
+```
+
+`POST /eval` on the live service returned `retrieval_hit_rate: 1.0`,
+`mean_judge_score: 1.0`, `all_approved: true` over the 3-question golden set.
+
+**Cost model:** HF Space free tier + Cloudflare Workers free plan (100k req/day)
++ GitHub free = **$0 fixed**. Only variable cost is the DeepSeek API
+(~$0.001/question). `DEEPSEEK_API_KEY` lives only in the Space secret store and
+local `.env` (gitignored). Teardown: `terraform destroy` in `infra/cloudflare/`
+removes the worker; deleting the Space removes the app. The free Space may
+sleep after ~48h idle — first request wakes it (cold start ≈1 min).
+
+```
+terraform apply  ->  Apply complete! Resources: 2 added, 0 changed, 0 destroyed.
+                     (cloudflare_workers_script.rag_proxy,
+                      cloudflare_workers_script_subdomain.rag_proxy)
+```
+
 ## Architecture
 
 ```mermaid
@@ -47,6 +108,15 @@ the `MemorySaver` checkpointer.
 src/state.py        OrchestratorState TypedDict (task, plan, results, retries…)
 src/nodes.py        planner_node, tool_node, critic_node, route_after_critic
 src/graph.py        StateGraph wiring + conditional edges + checkpointer
+src/rag.py          Chroma store (ONNX MiniLM embedding; hash embedding for offline tests)
+src/rag_state.py    RagState TypedDict (question, query, docs, verdict, retries…)
+src/rag_nodes.py    retrieve, answer, judge (DeepSeek), rewrite + route_after_judge
+src/rag_graph.py    RAG StateGraph: retrieve -> answer -> judge -> (rewrite loop)
+app/main.py         FastAPI service (/health /ask /eval /trace /orchestrate)
+app/tracing.py      SQLite trace log (LangSmith stand-in)
+data/docs/          demo corpus ingested at startup
+infra/cloudflare/   Terraform: CF Worker edge proxy (real apply, $0)
+Dockerfile          python:3.12-slim + uvicorn :7860 (HF Space)
 examples/run_example.py    end-to-end run against real DeepSeek
 examples/render_graph.py   renders assets/graph.png (Mermaid)
 tests/              pytest suite (LLM mocked → CI needs no key)
@@ -60,6 +130,9 @@ pip install -r requirements.txt
 
 export DEEPSEEK_API_KEY=sk-...        # Windows PS: $env:DEEPSEEK_API_KEY="sk-..."
 python examples/run_example.py
+
+# or serve the full API locally (same app as the live Space):
+uvicorn app.main:app --port 7860
 ```
 
 ### Tests (no API key required)

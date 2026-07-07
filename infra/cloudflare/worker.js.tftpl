@@ -1,0 +1,22 @@
+// Edge proxy: forwards every request to the Hugging Face Space origin.
+const UPSTREAM = "${upstream}";
+
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    const target = new URL(UPSTREAM);
+    target.pathname = url.pathname;
+    target.search = url.search;
+
+    const upstreamRequest = new Request(target, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+      redirect: "follow",
+    });
+    const response = await fetch(upstreamRequest);
+    const headers = new Headers(response.headers);
+    headers.set("x-served-by", "cloudflare-worker-terraform");
+    return new Response(response.body, { status: response.status, headers });
+  },
+};
